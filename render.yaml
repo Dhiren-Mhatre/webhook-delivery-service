@@ -52,10 +52,9 @@ services:
   - type: worker
     name: webhook-scheduler
     env: docker
-    dockerfilePath: ./Dockerfile-worker
+    dockerfilePath: ./Dockerfile-scheduler
     dockerContext: .
     plan: starter
-    startCommand: celery -A celery_app beat --loglevel=info
     envVars:
       - key: DATABASE_URL
         fromDatabase:
