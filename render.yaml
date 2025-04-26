@@ -35,6 +35,7 @@ services:
     dockerfilePath: ./Dockerfile-worker
     dockerContext: .
     plan: free
+    startCommand: celery -A celery_app worker --loglevel=info
     autoDeploy: false
     envVars:
       - key: DATABASE_URL
@@ -55,9 +56,10 @@ services:
   - type: web
     name: webhook-scheduler
     env: docker
-    dockerfilePath: ./Dockerfile-scheduler
+    dockerfilePath: ./Dockerfile-worker
     dockerContext: .
     plan: free
+    startCommand: celery -A celery_app beat --loglevel=info
     autoDeploy: false
     envVars:
       - key: DATABASE_URL

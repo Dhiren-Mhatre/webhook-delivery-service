@@ -25,5 +25,5 @@ RUN chmod +x /entrypoint.sh
 # Use the entrypoint script
 ENTRYPOINT ["/entrypoint.sh"]
 
-# Run the Celery worker
+# Default command for Celery worker
 CMD ["celery", "-A", "celery_app", "worker", "--loglevel=info"]
