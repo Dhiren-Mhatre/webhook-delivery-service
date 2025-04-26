@@ -1,0 +1,10 @@
+flask
+flask-sqlalchemy
+flask-caching
+sqlalchemy
+celery
+redis
+requests
+gunicorn
+psycopg2-binary
+werkzeug

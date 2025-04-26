@@ -1,0 +1,318 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <a href="{{ url_for('list_subscriptions') }}" class="text-decoration-none me-2">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                {{ subscription.name|default('Subscription #' + subscription.id|string) }}
+            </h1>
+            <div>
+                <a href="{{ url_for('edit_subscription', subscription_id=subscription.id) }}" class="btn btn-primary me-2">
+                    <i class="fas fa-edit"></i> Edit
+                </a>
+                <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Row -->
+<div class="row mb-4">
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="stat-card">
+            <p class="stat-value">{{ stats.total|default(0) }}</p>
+            <p class="stat-label">Total Deliveries</p>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="stat-card">
+            <p class="stat-value">{{ stats.success_rate|default(0) }}%</p>
+            <p class="stat-label">Success Rate</p>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="stat-card">
+            <p class="stat-value">{{ stats.avg_attempts|default('0.0') }}</p>
+            <p class="stat-label">Avg. Attempts</p>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="stat-card">
+            <p class="stat-value">
+                <span class="badge {{ 'status-active' if subscription.status == 'active' else 'status-failed' }}">
+                    {{ subscription.status|capitalize }}
+                </span>
+            </p>
+            <p class="stat-label">Status</p>
+        </div>
+    </div>
+</div>
+
+<!-- Subscription Details -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Subscription Details</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Target URL:</strong> <a href="{{ subscription.target_url }}" target="_blank" class="text-break">{{ subscription.target_url }}</a></p>
+                <p>
+                    <strong>Secret Key:</strong> 
+                    {% if subscription.secret %}
+                        <span class="badge status-configured me-2">Configured</span>
+                        <button class="btn btn-sm btn-outline-secondary" id="showSecretBtn">Show</button>
+                        <span id="secretValue" class="d-none ms-2">{{ subscription.secret }}</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Not Configured</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="col-md-6">
+                <p>
+                    <strong>Event Types:</strong><br>
+                    {% if subscription.event_types %}
+                        {% for event_type in subscription.event_types %}
+                            <span class="badge event-type">{{ event_type }}</span>
+                        {% endfor %}
+                    {% else %}
+                        <span class="badge bg-secondary">All Events</span>
+                    {% endif %}
+                </p>
+                <p><strong>Created:</strong> {{ subscription.created_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC</p>
+            </div>
+        </div>
+        
+        <div class="mt-3">
+            <div class="d-flex align-items-center">
+                <h6 class="mb-0 me-3">Webhook Endpoint:</h6>
+                <code class="bg-dark text-light p-2 rounded flex-grow-1">
+                    POST /api/ingest/{{ subscription.id }}
+                </code>
+            </div>
+            <div class="mt-2 small text-muted">
+                <p class="mb-1">Required Headers: <code>Content-Type: application/json</code></p>
+                {% if subscription.event_types %}
+                    <p class="mb-1">Optional Headers: <code>X-Event-Type: event.name</code> (should match one of the subscription's event types)</p>
+                {% endif %}
+                {% if subscription.secret %}
+                    <p class="mb-1">Signature Header: <code>X-Hub-Signature-256: sha256=...</code> (HMAC-SHA256 signature of the request body using your secret key)</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Test Webhook Card -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Test Webhook</h5>
+    </div>
+    <div class="card-body">
+        <form id="testWebhookForm">
+            <input type="hidden" id="subscriptionId" value="{{ subscription.id }}">
+            <div class="mb-3">
+                <label for="eventType" class="form-label">Event Type</label>
+                <input type="text" class="form-control" id="eventType" placeholder="e.g., order.created">
+                <div class="form-text">Optional. If specified, it should match one of the subscription's event types.</div>
+            </div>
+            <div class="mb-3">
+                <label for="payloadData" class="form-label">Payload (JSON)</label>
+                <textarea class="form-control" id="payloadData" rows="6">{
+  "event_id": "evt_123456",
+  "timestamp": "2023-01-01T12:00:00Z",
+  "data": {
+    "key1": "value1",
+    "key2": "value2"
+  }
+}</textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-paper-plane"></i> Send Test Webhook
+            </button>
+        </form>
+        
+        <div id="testResult" class="mt-3 d-none"></div>
+    </div>
+</div>
+
+<!-- Recent Deliveries -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Recent Deliveries</h5>
+        <a href="{{ url_for('deliveries', subscription_id=subscription.id) }}" class="btn btn-sm btn-outline-info">View All</a>
+    </div>
+    <div class="card-body p-0">
+        {% if recent_deliveries %}
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Event Type</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Completed</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for delivery in recent_deliveries %}
+                            <tr>
+                                <td><code class="small">{{ delivery.id|truncate(10, true, '') }}</code></td>
+                                <td>
+                                    {% if delivery.event_type %}
+                                        <span class="badge event-type">{{ delivery.event_type }}</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Generic</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if delivery.status == 'delivered' %}
+                                        <span class="badge status-delivered">Delivered</span>
+                                    {% elif delivery.status == 'failed' %}
+                                        <span class="badge status-failed">Failed</span>
+                                    {% elif delivery.status == 'processing' %}
+                                        <span class="badge status-processing">Processing</span>
+                                    {% else %}
+                                        <span class="badge status-pending">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ delivery.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                <td>
+                                    {% if delivery.completed_at %}
+                                        {{ delivery.completed_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('view_delivery', delivery_id=delivery.id) }}" class="btn btn-sm btn-outline-info">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-info m-3">
+                <i class="fas fa-info-circle"></i> No deliveries found for this subscription. Try sending a test webhook.
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this subscription?</p>
+                <p><strong>{{ subscription.name|default('Subscription #' + subscription.id|string) }}</strong></p>
+                <p><strong>Target URL:</strong> {{ subscription.target_url }}</p>
+                <p class="text-danger">This action cannot be undone and will delete all associated delivery logs!</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="{{ url_for('delete_subscription', subscription_id=subscription.id) }}">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Toggle secret visibility
+    document.addEventListener('DOMContentLoaded', function() {
+        const showSecretBtn = document.getElementById('showSecretBtn');
+        if (showSecretBtn) {
+            showSecretBtn.addEventListener('click', function() {
+                const secretValue = document.getElementById('secretValue');
+                
+                if (secretValue.classList.contains('d-none')) {
+                    secretValue.classList.remove('d-none');
+                    showSecretBtn.textContent = 'Hide';
+                } else {
+                    secretValue.classList.add('d-none');
+                    showSecretBtn.textContent = 'Show';
+                }
+            });
+        }
+    });
+    
+    // Handle test webhook form submission
+    document.getElementById('testWebhookForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const subscriptionId = document.getElementById('subscriptionId').value;
+        const eventType = document.getElementById('eventType').value;
+        const payloadData = document.getElementById('payloadData').value;
+        const resultDiv = document.getElementById('testResult');
+        
+        // Validate JSON
+        let payload;
+        try {
+            payload = JSON.parse(payloadData);
+        } catch (error) {
+            resultDiv.innerHTML = `<div class="alert alert-danger">Invalid JSON: ${error.message}</div>`;
+            resultDiv.classList.remove('d-none');
+            return;
+        }
+        
+        // Prepare headers
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        
+        if (eventType) {
+            headers['X-Event-Type'] = eventType;
+        }
+        
+        // Show loading state
+        resultDiv.innerHTML = `<div class="alert alert-info">Sending webhook...</div>`;
+        resultDiv.classList.remove('d-none');
+        
+        // Send the webhook
+        fetch(`/api/ingest/${subscriptionId}`, {
+            method: 'POST',
+            headers: headers,
+            body: payloadData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                resultDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <strong>Webhook accepted!</strong><br>
+                        Delivery ID: ${data.delivery_id}
+                    </div>`;
+                
+                // Reload the page after 2 seconds to show the new delivery
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            }
+        })
+        .catch(error => {
+            resultDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+        });
+    });
+</script>
+{% endblock %}

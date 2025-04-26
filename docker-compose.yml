@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: webhook-web
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/webhookdb
+      - REDIS_HOST=redis
+      - SESSION_SECRET=${SESSION_SECRET:-some-hard-to-guess-secret}
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    command: >
+      sh -c "sleep 5 && flask run --host=0.0.0.0 --port=5000"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile-worker
+    container_name: webhook-worker
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/webhookdb
+      - REDIS_HOST=redis
+      - C_FORCE_ROOT=true
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      web:
+        condition: service_started
+    restart: unless-stopped
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile-worker
+    container_name: webhook-scheduler
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/webhookdb
+      - REDIS_HOST=redis
+      - C_FORCE_ROOT=true
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      web:
+        condition: service_started
+    restart: unless-stopped
+    command: celery -A celery_app beat --loglevel=info
+
+  db:
+    image: postgres:13-alpine
+    container_name: webhook-db
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=webhookdb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:6-alpine
+    container_name: webhook-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

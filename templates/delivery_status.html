@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <a href="{{ url_for('deliveries') }}" class="text-decoration-none me-2">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                Webhook Delivery Details
+            </h1>
+            <span class="badge {{ 'status-delivered' if delivery.status == 'delivered' else 'status-failed' if delivery.status == 'failed' else 'status-processing' if delivery.status == 'processing' else 'status-pending' }}">
+                {{ delivery.status|capitalize }}
+            </span>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Delivery Information</h5>
+    </div>
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <p><strong>Delivery ID:</strong> <code>{{ delivery.id }}</code></p>
+                <p><strong>Subscription:</strong> 
+                    <a href="{{ url_for('view_subscription', subscription_id=delivery.subscription_id) }}">
+                        {{ subscription.name|default('Subscription #' + delivery.subscription_id|string) }}
+                    </a>
+                </p>
+                <p>
+                    <strong>Event Type:</strong> 
+                    {% if delivery.event_type %}
+                        <span class="badge event-type">{{ delivery.event_type }}</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Generic</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Created:</strong> {{ delivery.created_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC</p>
+                {% if delivery.completed_at %}
+                    <p><strong>Completed:</strong> {{ delivery.completed_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC</p>
+                    <p><strong>Processing Time:</strong> {{ (delivery.completed_at - delivery.created_at).total_seconds()|round(2) }} seconds</p>
+                {% else %}
+                    <p><strong>Completed:</strong> <span class="text-muted">Not completed yet</span></p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Payload</h5>
+    </div>
+    <div class="card-body p-0">
+        <pre class="json-payload bg-dark text-light m-0 p-3"><code>{{ payload }}</code></pre>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Delivery Attempts ({{ attempts|length }})</h5>
+    </div>
+    <div class="card-body p-0">
+        {% if attempts %}
+            <div class="delivery-attempts-container">
+                {% for attempt in attempts %}
+                    <div class="delivery-attempt {{ 'attempt-failed' if attempt.status == 'failed' else 'attempt-success' }}">
+                        <div class="attempt-header d-flex justify-content-between">
+                            <div>
+                                <span class="attempt-number">Attempt #{{ attempt.attempt_number }}</span>
+                                <span class="badge {{ 'bg-success' if attempt.status == 'success' else 'bg-danger' }} ms-2">
+                                    {{ attempt.status }}
+                                </span>
+                                {% if attempt.status_code %}
+                                    <span class="badge bg-info ms-1">HTTP {{ attempt.status_code }}</span>
+                                {% endif %}
+                            </div>
+                            <div>{{ attempt.created_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC</div>
+                        </div>
+                        
+                        {% if attempt.error_details %}
+                            <div class="mt-2">
+                                <div class="text-danger"><strong>Error:</strong></div>
+                                <div class="bg-dark text-light p-2 rounded mt-1 error-details">{{ attempt.error_details }}</div>
+                            </div>
+                        {% endif %}
+                        
+                        {% if attempt.response_body %}
+                            <div class="mt-2">
+                                <div><strong>Response:</strong></div>
+                                <pre class="mt-1 mb-0 p-2 bg-dark text-light response-body rounded"><code>{{ attempt.response_body }}</code></pre>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-info m-3">
+                <i class="fas fa-info-circle"></i> No delivery attempts have been made yet. The webhook is in the queue for processing.
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Function to pretty-print JSON if the response body is JSON
+        const responseBodies = document.querySelectorAll('.response-body code');
+        responseBodies.forEach(codeElement => {
+            try {
+                const content = codeElement.textContent;
+                const jsonObject = JSON.parse(content);
+                codeElement.textContent = JSON.stringify(jsonObject, null, 2);
+            } catch (e) {
+                // Not JSON or invalid JSON, leave as is
+            }
+        });
+    });
+</script>
+{% endblock %}

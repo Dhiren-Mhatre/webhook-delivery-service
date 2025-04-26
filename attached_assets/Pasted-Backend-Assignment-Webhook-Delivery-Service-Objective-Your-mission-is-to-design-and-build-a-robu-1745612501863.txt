@@ -1,0 +1,61 @@
+Backend Assignment: Webhook Delivery Service
+Objective:
+Your mission is to design and build a robust backend system that functions as a reliable webhook 
+delivery service. This service will ingest incoming webhooks, queue them, and attempt delivery to 
+subscribed target URLs, handling failures with retries and providing visibility into the delivery status.
+Core Requirements:
+1. Subscription Management:
+Implement API endpoints for CRUD (Create, Read, Update, Delete) operations on
+webhook subscriptions.
+A subscription should define at least:
+A unique identifier for the subscription.
+The target URL where the webhook payload should be delivered (POST
+request).
+(Optional but recommended) An optional secret key for payload signature
+verification (see Bonus Points).
+2. Webhook Ingestion:
+Implement an API endpoint (e.g., /ingest/{subscription_id} ) that accepts
+incoming webhook payloads via HTTP POST requests (assume JSON body).
+Upon receiving a payload, the service should quickly acknowledge the request (e.g.,
+return a 202 Accepted ) and queue the delivery task for asynchronous processing.
+3. Asynchronous Delivery Processing:
+Implement background workers to process the queued delivery tasks.
+For each task, the worker should:
+Retrieve the corresponding subscription details (target URL, secret).
+(Optional: Implement signature verification if secret is present).
+Attempt to deliver the original JSON payload via an HTTP POST request to the
+subscription's target URL. Set a reasonable timeout (e.g., 5-10 seconds).
+4. Retry Mechanism:
+If a delivery attempt fails (e.g., non-2xx response from the target URL, network error,
+timeout), the service must automatically retry the delivery.
+Implement a retry strategy with exponential backoff (e.g., retry after 10s, 30s, 1m, 5m,
+15m).
+Define a maximum number of retry attempts (e.g., 5 attempts). If all retries fail, mark the
+delivery as failed.
+5. Delivery Logging:
+Log the status of each delivery attempt (including retries).
+Logs should contain:
+Technical Requirements:
+Presentation (UI):
+Identifier for the original incoming webhook/delivery task.
+Subscription identifier.
+Target URL.
+Timestamp of the attempt.
+Attempt number (1 for initial, 2+ for retries).
+Outcome (Success, Failed Attempt, Failure).
+HTTP status code received from the target (if applicable).
+Error details on failure (if applicable).
+6. Log Retention:
+Implement a data retention policy for the delivery attempt logs. Keep logs for a defined
+period (e.g., 72 hours).
+Use background tasks to periodically delete logs older than the retention period.
+7. Status/Analytics Endpoint:
+Provide an API endpoint to retrieve the status and recent delivery attempt history for a
+specific original incoming webhook or delivery task ID.
+Provide an API endpoint to list recent delivery attempts (e.g., last 20) for a specific 
+subscription.
+8. Caching:
+Implement caching to optimize performance, especially during webhook ingestion and
+processing. Key areas:
+Cache subscription details (target URL, secret) based on subscription_id to
+avoid frequent database lookups in workers.

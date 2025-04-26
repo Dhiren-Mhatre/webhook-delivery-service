@@ -1,0 +1,317 @@
+/* Custom styles for Webhook Delivery Service */
+
+/* Global styles */
+:root {
+  --primary-bg: #f8f9fa;
+  --secondary-bg: #e9ecef;
+  --card-bg: #ffffff;
+  --text-color: #212529;
+  --border-color: #dee2e6;
+  --highlight-color: #0d6efd;
+  --success-color: #28a745;
+  --warning-color: #ffc107;
+  --danger-color: #dc3545;
+  --info-color: #17a2b8;
+}
+
+body {
+  background-color: var(--primary-bg);
+  color: var(--text-color);
+}
+
+.card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.card-header {
+  background-color: var(--secondary-bg);
+  border-bottom: 1px solid var(--border-color);
+  padding: 1rem;
+}
+
+/* Navigation */
+.navbar {
+  background-color: #0069d9;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  color: white;
+}
+
+.navbar .nav-link {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.navbar .nav-link:hover {
+  color: white;
+}
+
+.navbar-brand {
+  font-weight: bold;
+  color: white !important;
+}
+
+.nav-item.active {
+  font-weight: bold;
+  border-bottom: 2px solid var(--highlight-color);
+}
+
+/* Buttons */
+.add-subscription-btn {
+  background-color: var(--highlight-color);
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.5rem 1rem;
+}
+
+.add-subscription-btn:hover {
+  background-color: #006adb;
+  color: white;
+}
+
+/* Stats cards */
+.stat-card {
+  background-color: var(--secondary-bg);
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  text-align: center;
+  height: 100%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 0.25rem;
+  color: var(--highlight-color);
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: #666;
+  margin-bottom: 0;
+}
+
+/* Status badges */
+.status-active {
+  background-color: var(--success-color);
+}
+
+.status-inactive {
+  background-color: var(--warning-color);
+}
+
+.status-failed {
+  background-color: var(--danger-color);
+}
+
+.status-delivered {
+  background-color: var(--success-color);
+}
+
+.status-processing {
+  background-color: var(--warning-color);
+  color: #212529;
+}
+
+.status-pending {
+  background-color: #6c757d;
+}
+
+.status-configured {
+  background-color: var(--info-color);
+}
+
+.event-type {
+  background-color: #6610f2;
+}
+
+/* Delivery log */
+.delivery-log {
+  background-color: var(--secondary-bg);
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.delivery-id {
+  font-family: monospace;
+  background-color: var(--primary-bg);
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  margin-right: 0.5rem;
+}
+
+.delivery-status {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  color: white;
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  margin-left: 0.5rem;
+}
+
+.payload-container {
+  background-color: var(--primary-bg);
+  border-radius: 0.375rem;
+  padding: 1rem;
+  margin-top: 0.75rem;
+  overflow-x: auto;
+}
+
+.payload-btn {
+  background-color: var(--secondary-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.delivery-attempt {
+  background-color: var(--primary-bg);
+  border-radius: 0.375rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-left: 4px solid var(--success-color);
+}
+
+.delivery-attempt.failed {
+  border-left-color: var(--danger-color);
+}
+
+.delivery-attempt-pending {
+  background-color: var(--primary-bg);
+  border-radius: 0.375rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-left: 4px solid #6c757d;
+  color: #aaa;
+  font-style: italic;
+}
+
+.attempt-number {
+  font-weight: bold;
+}
+
+.delivery-attempts-container {
+  padding: 1rem;
+}
+
+/* Form checkboxes */
+.event-type-checkbox {
+  margin-bottom: 0.5rem;
+}
+
+.event-type-checkbox .form-check-input:checked {
+  background-color: var(--highlight-color);
+  border-color: var(--highlight-color);
+}
+
+/* Action icons */
+.action-icons .btn {
+  margin-right: 0.25rem;
+}
+
+/* Subscription name column */
+.subscription-name {
+  font-weight: bold;
+}
+
+/* JSON payload formatting */
+.json-payload {
+  border-radius: 0 0 0.5rem 0.5rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* Status bar */
+.status-bar {
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 1rem 0;
+}
+
+.status-bar-section {
+  height: 100%;
+  float: left;
+}
+
+/* Test webhook modal */
+.test-webhook-modal .modal-content {
+  background-color: var(--card-bg);
+  color: var(--text-color);
+}
+
+.test-webhook-modal .modal-header {
+  background-color: var(--secondary-bg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.test-webhook-modal .modal-footer {
+  border-top: 1px solid var(--border-color);
+}
+
+/* Custom table styling */
+.table {
+  color: var(--text-color);
+}
+
+.table thead {
+  background-color: var(--secondary-bg);
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Error details formatting */
+.error-details {
+  font-family: monospace;
+  white-space: pre-wrap;
+}
+
+.response-body {
+  font-family: monospace;
+  white-space: pre-wrap;
+}
+
+/* Event type options */
+.event-types-container {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #dee2e6;
+  border-radius: 0.25rem;
+}
+
+.event-types-container .btn-outline-secondary {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  border-bottom: 1px solid #dee2e6;
+  text-align: left;
+  padding: 0.5rem 1rem;
+}
+
+.event-types-container .btn-outline-secondary:last-child {
+  border-bottom: none;
+}
+
+.event-types-container .btn-check:checked + .btn-outline-secondary {
+  background-color: #e9ecef;
+  border-color: #dee2e6;
+  color: #000;
+  font-weight: bold;
+}

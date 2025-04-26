@@ -1,0 +1,83 @@
+Technical Requirements: 
+« Language: Use either Python or Go. Choose the language you are most comfortable with. 
+« Framework: You are free to choose any web framework suitable for your chosen language 
+(e.g., Flask, Django, FastAPI for Python; Gin, Echo for Go). 
+« Database: Choose a suitable database (SQL or NoSQL). Your choice should reflect 
+considerations for storing subscriptions and a potentially large volume of delivery logs. Explain 
+your choice in the README. 
+« Asynchronous Tasks / Queuing: Implement a robust mechanism for queuing webhook 
+deliveries and handling background tasks. This is critical for ingestion decoupling, retries, and 
+log cleanup. 
+« Containerisation: The entire application (API, background workers, database, Redis, queue if 
+applicable) must be containerised using Docker and orchestrated using docker-compose . 
+The setup should work locally with just Docker installed. Assume no other software will be 
+installed on the machine. Also all testing will be done on a mac device. 
+« Deployment: Deploy the application to a free tier of any public cloud provider (e.g., AWS 
+EC2/ECS Fargate, Google Cloud Run/App Engine, Heroku, Render). 
+Presentation (Ul): 
+« A minimal Ul is required to interact with the service (manage subscriptions, view delivery 
+status/logs for a subscription).
+* This can be: 
+o A simple custom web Ul. 
+o A generated Ul via Swagger/OpenAPI| documentation. 
+« Focus on functionality, not aesthetics. 
+Deliverables: 
+« Alink to a private GitHub repository containing your source code. Add 
+shobhit@segwise.ai and chinmay@segwise.ai as collaborators. Please do not create an 
+empty repo and and us. Only do it when you are ready to submit. 
+« A comprehensive README.md file in the repository containing: 
+o Clear, step-by-step instructions on how to set up and run the application locally using 
+Docker. Verify these instructions work. 
+o The link to the live, deployed application. 
+o Explanation of your architecture choices (framework, database, async task/queueing 
+system, retry strategy, etc.). 
+o Discussion on database schema and indexing strategies. 
+o Sample curl commands or equivalent demonstrating how to use each API endpoint 
+(managing subscriptions, ingesting webhooks, checking status). 
+o An estimation of the monthly cost to run the deployed solution on the chosen free tier, 
+assuming continuous operation (24x7) and moderate traffic (e.g., 5000 webhooks 
+ingested/day, average 1.2 delivery attempts per webhook). 
+o Any assumptions made. 
+o Credits for any significant libraries, external resources, or Al tools used. 
+Evaluation Criteria (in order of importance): 
+1. Completeness & Correctness: 
+o All core requirements implemented (Subscription CRUD, Ingestion, Async Delivery, 
+Retries, Logging, Retention, Status API). 
+o Deployed solution is functional. 
+o Webhook delivery, retries, logging, and retention work correctly. 
+o Caching (Redis) is implemented effectively. 
+o Async tasks/queuing are handled reliably. 
+2. Documentation & Setup: 
+o README is clear, comprehensive, and accurate. 
+o Local setup instructions work flawlessly using Docker. 
+o APl documentation/examples are provided. 
+3. Code Quality & Maintainability: 
+o Code is clean, well-structured, readable, and follows language best practices. 
+o Appropriate use of comments. 
+o Meaningful variable and function names. 
+4. Tests:
+o Includes unit and/or integration tests covering critical logic (e.g., subscription 
+management, queueing, delivery attempts, retries, status checks). 
+5. Performance & Scalability Considerations: 
+o Demonstrates awareness of performance (e.g., indexing, caching, efficient queuing). 
+o No obvious performance bottlenecks for the specified requirements. 
+6. Cost Effectiveness: 
+o Solution utilizes free-tier resources effectively. 
+o Cost estimation is provided and reasonable. 
+7. Minimal Ul: 
+o Ul allows basic interaction and testing of features. 
+Bonus Points: 
+« Payload Signature Verification: Implement verification of incoming webhooks using a 
+standard method (e.g., checking an X-Hub-Signature-256 header containing an HMACSHA256 hash of the payload, using the stored subscription secret) (+2 points). The ingestion 
+endpoint should reject payloads with invalid signatures. 
+« Event Type Filtering: Allow subscriptions to specify specific event types they are interested in 
+(e.g., order.created, user.updated ). The ingestion endpoint should accept an event type 
+(e.g., in a header or query param), and only deliver webhooks to subscriptions matching that 
+event type (+2 points). 
+Submission: 
+« Use the form link in the email to submit. Provide your git repo link, deployment link. 
++ Please use same email id in all communications. 
+Note: You are encouraged to use online resources, libraries, and tools. Please provide attribution in 
+your README. Make reasonable assumptions if any requirement is unclear, and document these 
+assumptions. 
+Good luck, and happy building

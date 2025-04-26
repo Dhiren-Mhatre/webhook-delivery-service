@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="fas fa-history me-2"></i> Webhook Delivery Logs</h1>
+            <div>
+                <div class="dropdown d-inline-block">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="filterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        {% if filter_subscription %}
+                            Subscription #{{ filter_subscription }}
+                        {% else %}
+                            All Subscriptions
+                        {% endif %}
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="filterDropdown">
+                        <li><a class="dropdown-item" href="{{ url_for('deliveries') }}">All Subscriptions</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        {% for sub in subscriptions %}
+                        <li><a class="dropdown-item" href="{{ url_for('deliveries', subscription_id=sub.id) }}">
+                            {{ sub.name|default('Subscription #' + sub.id|string) }}
+                        </a></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <button type="button" class="btn btn-success ms-2" data-bs-toggle="modal" data-bs-target="#testWebhookModal">
+                    <i class="fas fa-paper-plane"></i> Test Webhook
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% for delivery in deliveries %}
+<div class="delivery-log">
+    <div class="d-flex justify-content-between mb-3">
+        <div>
+            <span class="delivery-id">ID: {{ delivery.id|string|truncate(12, true, '') }}</span>
+            {% if delivery.event_type %}
+            <span class="badge event-type">{{ delivery.event_type }}</span>
+            {% else %}
+            <span class="badge bg-secondary">generic</span>
+            {% endif %}
+            
+            <span class="delivery-status status-{{ delivery.status }}">{{ delivery.status }}</span>
+        </div>
+        <div>
+            Created at: {{ delivery.created_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC
+            <a href="#" class="payload-btn ms-2" id="payloadToggle{{ loop.index }}" onclick="togglePayload({{ loop.index }}); return false;">
+                <i class="fas fa-code"></i> Payload
+            </a>
+        </div>
+    </div>
+    
+    <div class="payload-container d-none" id="payload{{ loop.index }}">
+        <pre><code>{{ delivery.payload|tojson(indent=2) }}</code></pre>
+    </div>
+    
+    <h6 class="mt-3 mb-2">Delivery Attempts:</h6>
+    
+    {% if delivery.attempts %}
+        {% for attempt in delivery.attempts %}
+            <div class="delivery-attempt {{ 'failed' if attempt.status == 'failed' else '' }}">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <strong>Attempt #{{ attempt.attempt_number }}</strong>
+                        <span class="badge {{ 'bg-success' if attempt.status == 'success' else 'bg-danger' }} ms-2">
+                            {{ attempt.status }}
+                        </span>
+                        {% if attempt.status_code %}
+                            <span class="badge bg-info ms-1">HTTP {{ attempt.status_code }}</span>
+                        {% endif %}
+                    </div>
+                    <div>{{ attempt.created_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC</div>
+                </div>
+                
+                {% if attempt.error_details %}
+                    <div class="mt-2">
+                        <strong>Error:</strong> {{ attempt.error_details }}
+                    </div>
+                {% endif %}
+                
+                {% if attempt.response_body %}
+                    <div class="mt-2">
+                        <strong>Response:</strong>
+                        <pre class="mt-1 mb-0 p-2 bg-light"><code>{{ attempt.response_body }}</code></pre>
+                    </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="delivery-attempt-pending">
+            <i class="fas fa-clock"></i> Awaiting processing...
+        </div>
+    {% endif %}
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body">
+        <div class="alert alert-info mb-0">
+            <i class="fas fa-info-circle"></i> No delivery logs found. Try sending a test webhook.
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{% if has_next_page %}
+<div class="d-flex justify-content-center mt-4">
+    <a href="{{ url_for('deliveries', page=(page or 1) + 1, subscription_id=filter_subscription) }}" class="btn btn-outline-primary">
+        Load More <i class="fas fa-chevron-down"></i>
+    </a>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function togglePayload(index) {
+        const payloadElement = document.getElementById(`payload${index}`);
+        const toggleButton = document.getElementById(`payloadToggle${index}`);
+        
+        if (payloadElement.classList.contains('d-none')) {
+            payloadElement.classList.remove('d-none');
+            toggleButton.innerHTML = '<i class="fas fa-code"></i> Hide Payload';
+        } else {
+            payloadElement.classList.add('d-none');
+            toggleButton.innerHTML = '<i class="fas fa-code"></i> Payload';
+        }
+    }
+</script>
+{% endblock %}

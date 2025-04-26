@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webhook Delivery Service</title>
+    
+    <!-- Bootstrap CSS (light theme) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom styles -->
+    <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-share-from-square me-2"></i>
+                Webhook Delivery Service
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item {{ 'active' if request.path == url_for('index') else '' }}">
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="fas fa-home"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item {{ 'active' if request.path == url_for('list_subscriptions') else '' }}">
+                        <a class="nav-link" href="{{ url_for('list_subscriptions') }}">
+                            <i class="fas fa-cog"></i> Subscriptions
+                        </a>
+                    </li>
+                    <li class="nav-item {{ 'active' if request.path.startswith('/deliveries') else '' }}">
+                        <a class="nav-link" href="{{ url_for('deliveries') }}">
+                            <i class="fas fa-history"></i> Delivery Logs
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container">
+        {% for category, message in get_flashed_messages(with_categories=true) %}
+            <div class="alert alert-{{ category }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+        
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Test Webhook Modal -->
+    <div class="modal fade test-webhook-modal" id="testWebhookModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-paper-plane me-2"></i> Test Webhook
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="globalTestWebhookForm">
+                        <div class="mb-3">
+                            <label for="modalSubscriptionId" class="form-label">Subscription</label>
+                            <select class="form-select" id="modalSubscriptionId" required>
+                                <option value="" selected disabled>Select a subscription</option>
+                                {% for sub in subscriptions %}
+                                    <option value="{{ sub.id }}">
+                                        {{ sub.name|default('Subscription #' + sub.id|string) }} ({{ sub.target_url }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Event Type</label>
+                            <div class="event-types-container">
+                                <div class="btn-group-vertical w-100" role="group" id="eventTypeOptions">
+                                    <input type="radio" class="btn-check" name="eventType" id="eventTypeNone" value="" checked>
+                                    <label class="btn btn-outline-secondary text-start" for="eventTypeNone">None (Generic webhook)</label>
+                                    
+                                    <!-- Order events -->
+                                    <input type="radio" class="btn-check" name="eventType" id="eventTypeOrderCreated" value="order.created">
+                                    <label class="btn btn-outline-secondary text-start" for="eventTypeOrderCreated">order.created</label>
+                                    
+                                    <input type="radio" class="btn-check" name="eventType" id="eventTypeOrderUpdated" value="order.updated">
+                                    <label class="btn btn-outline-secondary text-start" for="eventTypeOrderUpdated">order.updated</label>
+                                    
+                                    <!-- User events -->
+                                    <input type="radio" class="btn-check" name="eventType" id="eventTypeUserCreated" value="user.created">
+                                    <label class="btn btn-outline-secondary text-start" for="eventTypeUserCreated">user.created</label>
+                                    
+                                    <input type="radio" class="btn-check" name="eventType" id="eventTypeUserUpdated" value="user.updated">
+                                    <label class="btn btn-outline-secondary text-start" for="eventTypeUserUpdated">user.updated</label>
+                                    
+                                    <!-- Payment events -->
+                                    <input type="radio" class="btn-check" name="eventType" id="eventTypePaymentSucceeded" value="payment.succeeded">
+                                    <label class="btn btn-outline-secondary text-start" for="eventTypePaymentSucceeded">payment.succeeded</label>
+                                    
+                                    <input type="radio" class="btn-check" name="eventType" id="eventTypePaymentFailed" value="payment.failed">
+                                    <label class="btn btn-outline-secondary text-start" for="eventTypePaymentFailed">payment.failed</label>
+                                </div>
+                            </div>
+                            <div class="form-text">Select an event type. Only events matching the subscription's configured types will be processed.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="modalPayloadData" class="form-label">Payload (JSON)</label>
+                            <textarea class="form-control" id="modalPayloadData" rows="8">{
+  "event_id": "evt_123456",
+  "timestamp": "2023-01-01T12:00:00Z",
+  "data": {
+    "key1": "value1",
+    "key2": "value2"
+  }
+}</textarea>
+                        </div>
+                    </form>
+                    <div id="modalTestResult" class="d-none mt-3"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="sendTestWebhookBtn">
+                        <i class="fas fa-paper-plane"></i> Send Webhook
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap & jQuery -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <!-- Global scripts -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle global test webhook form
+            const sendTestWebhookBtn = document.getElementById('sendTestWebhookBtn');
+            if (sendTestWebhookBtn) {
+                sendTestWebhookBtn.addEventListener('click', function() {
+                    const subscriptionId = document.getElementById('modalSubscriptionId').value;
+                    // Get the selected event type from radio buttons
+                    const selectedEventType = document.querySelector('input[name="eventType"]:checked');
+                    const eventType = selectedEventType ? selectedEventType.value : '';
+                    const payloadData = document.getElementById('modalPayloadData').value;
+                    const resultDiv = document.getElementById('modalTestResult');
+                    
+                    if (!subscriptionId) {
+                        resultDiv.innerHTML = `<div class="alert alert-danger">Please select a subscription</div>`;
+                        resultDiv.classList.remove('d-none');
+                        return;
+                    }
+                    
+                    // Validate JSON
+                    let payload;
+                    try {
+                        payload = JSON.parse(payloadData);
+                    } catch (error) {
+                        resultDiv.innerHTML = `<div class="alert alert-danger">Invalid JSON: ${error.message}</div>`;
+                        resultDiv.classList.remove('d-none');
+                        return;
+                    }
+                    
+                    // Prepare headers
+                    const headers = {
+                        'Content-Type': 'application/json'
+                    };
+                    
+                    if (eventType) {
+                        headers['X-Event-Type'] = eventType;
+                    }
+                    
+                    // Show loading state
+                    resultDiv.innerHTML = `<div class="alert alert-info">Sending webhook...</div>`;
+                    resultDiv.classList.remove('d-none');
+                    
+                    // Send the webhook
+                    fetch(`/api/ingest/${subscriptionId}`, {
+                        method: 'POST',
+                        headers: headers,
+                        body: payloadData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            resultDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                        } else if (data.status === 'rejected') {
+                            // Handle event type rejection
+                            resultDiv.innerHTML = `
+                                <div class="alert alert-warning">
+                                    <strong>Event Type Rejected!</strong><br>
+                                    ${data.message}<br><br>
+                                    <small>The webhook was received but not delivered because the subscription doesn't accept this event type.</small>
+                                </div>`;
+                        } else {
+                            resultDiv.innerHTML = `
+                                <div class="alert alert-success">
+                                    <strong>Webhook accepted!</strong><br>
+                                    Delivery ID: ${data.delivery_id}
+                                </div>
+                                <p class="text-center mt-2">
+                                    <a href="/delivery/${data.delivery_id}" class="btn btn-sm btn-outline-info">
+                                        View Delivery Details
+                                    </a>
+                                </p>`;
+                            
+                            // Close the modal and refresh the page after 1.5 seconds
+                            setTimeout(function() {
+                                // Hide the modal
+                                const modal = bootstrap.Modal.getInstance(document.getElementById('testWebhookModal'));
+                                modal.hide();
+                                
+                                // Refresh the page
+                                window.location.reload();
+                            }, 1500);
+                        }
+                    })
+                    .catch(error => {
+                        resultDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+                    });
+                });
+            }
+        });
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>
