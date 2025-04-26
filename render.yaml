@@ -71,14 +71,14 @@ services:
           name: webhook-redis
           type: redis
           property: port
+        
+  # Redis Service
+  - type: redis
+    name: webhook-redis
+    plan: free
+    ipAllowList: []
 
 databases:
   - name: webhook-db
     plan: free
     postgresMajorVersion: 13
-
-services:
-  - type: redis
-    name: webhook-redis
-    plan: free
-    ipAllowList: []
