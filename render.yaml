@@ -1,0 +1,87 @@
+services:
+  # Web Service
+  - type: web
+    name: webhook-web
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: webhook-db
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          name: webhook-redis
+          type: redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          name: webhook-redis
+          type: redis
+          property: port
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHONUNBUFFERED
+        value: "1"
+  # Worker Service
+  - type: web # Changed from worker to web with custom start command
+    name: webhook-worker
+    env: docker
+    dockerfilePath: ./Dockerfile-worker
+    dockerContext: .
+    plan: free
+    startCommand: celery -A celery_app worker --loglevel=info
+    autoDeploy: false # Prevent auto-deployments to avoid interrupting workers
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: webhook-db
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          name: webhook-redis
+          type: redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          name: webhook-redis
+          type: redis
+          property: port
+  # Scheduler Service
+  - type: web # Changed from worker to web with custom start command
+    name: webhook-scheduler
+    env: docker
+    dockerfilePath: ./Dockerfile-worker
+    dockerContext: .
+    plan: free
+    startCommand: celery -A celery_app beat --loglevel=info
+    autoDeploy: false # Prevent auto-deployments
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: webhook-db
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          name: webhook-redis
+          type: redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          name: webhook-redis
+          type: redis
+          property: port
+databases:
+  - name: webhook-db
+    plan: free
+    postgresMajorVersion: 13
+services:
+  - type: redis
+    name: webhook-redis
+    plan: free
+    ipAllowList: []
