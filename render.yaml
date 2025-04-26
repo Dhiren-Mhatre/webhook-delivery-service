@@ -29,14 +29,14 @@ services:
       - key: PYTHONUNBUFFERED
         value: "1"
   # Worker Service
-  - type: web # Changed from worker to web with custom start command
+  - type: web 
     name: webhook-worker
     env: docker
     dockerfilePath: ./Dockerfile-worker
     dockerContext: .
     plan: free
     startCommand: celery -A celery_app worker --loglevel=info
-    autoDeploy: false # Prevent auto-deployments to avoid interrupting workers
+    autoDeploy: false
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -53,14 +53,14 @@ services:
           type: redis
           property: port
   # Scheduler Service
-  - type: web # Changed from worker to web with custom start command
+  - type: web
     name: webhook-scheduler
     env: docker
     dockerfilePath: ./Dockerfile-worker
     dockerContext: .
     plan: free
     startCommand: celery -A celery_app beat --loglevel=info
-    autoDeploy: false # Prevent auto-deployments
+    autoDeploy: false
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -76,12 +76,13 @@ services:
           name: webhook-redis
           type: redis
           property: port
-databases:
-  - name: webhook-db
-    plan: free
-    postgresMajorVersion: 13
-services:
+  # Redis Service
   - type: redis
     name: webhook-redis
     plan: free
     ipAllowList: []
+
+databases:
+  - name: webhook-db
+    plan: free
+    postgresMajorVersion: 13
