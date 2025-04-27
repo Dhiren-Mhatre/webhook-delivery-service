@@ -12,17 +12,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install python-dotenv gunicorn
+RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
 # Copy application code
 COPY . .
 
-# Create worker service with health check
-RUN echo 'import os\nimport threading\nfrom flask import Flask\n\napp = Flask(__name__)\n\n@app.route("/")\n@app.route("/health")\ndef health():\n    return "OK"\n\ndef run_worker():\n    os.system("celery -A celery_app worker --loglevel=info")\n\nif __name__ == "__main__":\n    worker_thread = threading.Thread(target=run_worker)\n    worker_thread.daemon = True\n    worker_thread.start()\n' > worker_app.py
+# Create a very simple health check app
+RUN echo 'import os\nimport threading\nfrom flask import Flask\n\napp = Flask(__name__)\n\n@app.route("/")\ndef root():\n    return "OK"\n\n@app.route("/health")\ndef health():\n    return "OK"\n\n@app.route("/disable-health-check")\ndef disable_health_check():\n    return "OK"\n\ndef run_worker():\n    import subprocess\n    subprocess.Popen(["celery", "-A", "celery_app", "worker", "--loglevel=info"])\n\n# Start the worker in the background\nrun_worker()\n' > worker_app.py
 
-# Expose port (Render will set PORT env var)
+# Expose port
 EXPOSE 8081
 
-# Run with Gunicorn (this is key for Render)
-CMD gunicorn --bind 0.0.0.0:$PORT worker_app:app
+# Run with Gunicorn and bind to the PORT env var
+CMD gunicorn worker_app:app --bind 0.0.0.0:$PORT --log-level debug

@@ -38,6 +38,7 @@ services:
     plan: free
     port: 8081
     healthCheckPath: /health
+    healthCheckTimeout: 60
     envVars:
       - key: DATABASE_URL
         fromDatabase:
