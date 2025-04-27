@@ -57,7 +57,7 @@ services:
     env: docker
     dockerfilePath: ./Dockerfile-scheduler
     dockerContext: .
-    plan: free
+    plan: starter
     # Using cron job instead of continuous worker
     schedule: "*/10 * * * *"
     envVars:
