@@ -15,23 +15,26 @@ services:
       - key: REDIS_HOST
         fromService:
           name: webhook-redis
-          type: redis
+          type: keyvalue
           property: host
       - key: REDIS_PORT
         fromService:
           name: webhook-redis
-          type: redis
+          type: keyvalue
           property: port
       - key: SESSION_SECRET
         generateValue: true
 
-  # Worker Service
-  - type: worker
+  # Worker Service - requires a paid plan to deploy (starter or pro)
+  - type: web
     name: webhook-worker
     env: docker
     dockerfilePath: ./Dockerfile-worker
     dockerContext: .
     plan: free
+    # Using web service type with health check disabled as alternative to worker
+    autoDeploy: false
+    healthCheckPath: /disable-health-check
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -40,21 +43,23 @@ services:
       - key: REDIS_HOST
         fromService:
           name: webhook-redis
-          type: redis
+          type: keyvalue
           property: host
       - key: REDIS_PORT
         fromService:
           name: webhook-redis
-          type: redis
+          type: keyvalue
           property: port
 
-  # Scheduler Service
-  - type: worker
+  # Scheduler Service - requires a paid plan to deploy (starter or pro)
+  - type: cron
     name: webhook-scheduler
     env: docker
     dockerfilePath: ./Dockerfile-scheduler
     dockerContext: .
     plan: free
+    # Using cron job instead of continuous worker
+    schedule: "*/10 * * * *"
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -63,19 +68,20 @@ services:
       - key: REDIS_HOST
         fromService:
           name: webhook-redis
-          type: redis
+          type: keyvalue
           property: host
       - key: REDIS_PORT
         fromService:
           name: webhook-redis
-          type: redis
+          type: keyvalue
           property: port
         
-  # Redis Service
-  - type: redis
+  # Redis Service - using keyvalue type (newer name for redis type)
+  - type: keyvalue
     name: webhook-redis
     plan: free
     ipAllowList: []
+    maxmemoryPolicy: allkeys-lru
 
 databases:
   - name: webhook-db
