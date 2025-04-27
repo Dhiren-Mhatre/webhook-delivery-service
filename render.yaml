@@ -74,10 +74,10 @@ services:
   # Redis Service
   - type: redis
     name: webhook-redis
-    plan: free
+    plan: starter
     ipAllowList: []
 
 databases:
   - name: webhook-db
-    plan: free
+    plan: starter
     postgresMajorVersion: 13
