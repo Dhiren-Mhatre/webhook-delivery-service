@@ -22,8 +22,14 @@ COPY . .
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Expose a port for health checks (important for Render)
+EXPOSE 8081
+
 # Use the entrypoint script
 ENTRYPOINT ["/entrypoint.sh"]
 
-# Default command for Celery worker
-CMD ["celery", "-A", "celery_app", "worker", "--loglevel=info"]
+# Create a simple health check endpoint
+RUN echo 'from flask import Flask\napp = Flask(__name__)\n@app.route("/health")\ndef health():\n    return "OK"\n\nif __name__ == "__main__":\n    import threading\n    import os\n    def run_worker():\n        os.system("celery -A celery_app worker --loglevel=info")\n    worker_thread = threading.Thread(target=run_worker)\n    worker_thread.daemon = True\n    worker_thread.start()\n    app.run(host="0.0.0.0", port=8081)' > health_check.py
+
+# Run worker with health check
+CMD ["python", "health_check.py"]

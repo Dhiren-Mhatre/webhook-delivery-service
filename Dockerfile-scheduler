@@ -6,15 +6,30 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    postgresql-client \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install python-dotenv
 
 # Copy application code
 COPY . .
 
-# Run the scheduler
-CMD ["celery", "-A", "celery_app", "beat", "--loglevel=info"]
+# Make the entrypoint script executable
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Expose a port for health checks (important for Render)
+EXPOSE 8082
+
+# Use the entrypoint script
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Create a simple health check endpoint
+RUN echo 'from flask import Flask\napp = Flask(__name__)\n@app.route("/health")\ndef health():\n    return "OK"\n\nif __name__ == "__main__":\n    import threading\n    import os\n    def run_scheduler():\n        os.system("celery -A celery_app beat --loglevel=info")\n    scheduler_thread = threading.Thread(target=run_scheduler)\n    scheduler_thread.daemon = True\n    scheduler_thread.start()\n    app.run(host="0.0.0.0", port=8082)' > health_check.py
+
+# Run scheduler with health check
+CMD ["python", "health_check.py"]

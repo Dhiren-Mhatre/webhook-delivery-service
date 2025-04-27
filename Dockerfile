@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install python-dotenv
+RUN pip install python-dotenv gunicorn
 
 # Copy application code
 COPY . .
@@ -23,10 +23,10 @@ COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Expose port for the application
-EXPOSE 5000
+EXPOSE 8080
 
 # Use the entrypoint script
 ENTRYPOINT ["/entrypoint.sh"]
 
-# Run the application
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
+# Run the application with gunicorn (essential for Render)
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]

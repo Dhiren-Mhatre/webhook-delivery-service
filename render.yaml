@@ -7,6 +7,8 @@ services:
     dockerContext: .
     plan: free
     healthCheckPath: /
+    # Explicitly specify the port
+    port: 8080
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -15,26 +17,27 @@ services:
       - key: REDIS_HOST
         fromService:
           name: webhook-redis
-          type: keyvalue
+          type: redis
           property: host
       - key: REDIS_PORT
         fromService:
           name: webhook-redis
-          type: keyvalue
+          type: redis
           property: port
       - key: SESSION_SECRET
         generateValue: true
+      - key: PORT
+        value: 8080
 
-  # Worker Service - requires a paid plan to deploy (starter or pro)
+  # Worker Service (as web service with health check endpoint)
   - type: web
     name: webhook-worker
     env: docker
     dockerfilePath: ./Dockerfile-worker
     dockerContext: .
     plan: free
-    # Using web service type with health check disabled as alternative to worker
-    autoDeploy: false
-    healthCheckPath: /disable-health-check
+    port: 8081
+    healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -43,23 +46,25 @@ services:
       - key: REDIS_HOST
         fromService:
           name: webhook-redis
-          type: keyvalue
+          type: redis
           property: host
       - key: REDIS_PORT
         fromService:
           name: webhook-redis
-          type: keyvalue
+          type: redis
           property: port
+      - key: PORT
+        value: 8081
 
-  # Scheduler Service - requires a paid plan to deploy (starter or pro)
-  - type: cron
+  # Scheduler Service (as web service with health check endpoint)
+  - type: web
     name: webhook-scheduler
     env: docker
     dockerfilePath: ./Dockerfile-scheduler
     dockerContext: .
-    plan: starter
-    # Using cron job instead of continuous worker
-    schedule: "*/10 * * * *"
+    plan: free
+    port: 8082
+    healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -68,20 +73,21 @@ services:
       - key: REDIS_HOST
         fromService:
           name: webhook-redis
-          type: keyvalue
+          type: redis
           property: host
       - key: REDIS_PORT
         fromService:
           name: webhook-redis
-          type: keyvalue
+          type: redis
           property: port
-        
-  # Redis Service - using keyvalue type (newer name for redis type)
-  - type: keyvalue
+      - key: PORT
+        value: 8082
+
+  # Redis Service
+  - type: redis
     name: webhook-redis
     plan: free
     ipAllowList: []
-    maxmemoryPolicy: allkeys-lru
 
 databases:
   - name: webhook-db
