@@ -13,23 +13,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install python-dotenv
+RUN pip install python-dotenv gunicorn
 
 # Copy application code
 COPY . .
 
-# Make the entrypoint script executable
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Create worker service with health check
+RUN echo 'import os\nimport threading\nfrom flask import Flask\n\napp = Flask(__name__)\n\n@app.route("/")\n@app.route("/health")\ndef health():\n    return "OK"\n\ndef run_worker():\n    os.system("celery -A celery_app worker --loglevel=info")\n\nif __name__ == "__main__":\n    worker_thread = threading.Thread(target=run_worker)\n    worker_thread.daemon = True\n    worker_thread.start()\n' > worker_app.py
 
-# Expose a port for health checks (important for Render)
+# Expose port (Render will set PORT env var)
 EXPOSE 8081
 
-# Use the entrypoint script
-ENTRYPOINT ["/entrypoint.sh"]
-
-# Create a simple health check endpoint
-RUN echo 'from flask import Flask\napp = Flask(__name__)\n@app.route("/health")\ndef health():\n    return "OK"\n\nif __name__ == "__main__":\n    import threading\n    import os\n    def run_worker():\n        os.system("celery -A celery_app worker --loglevel=info")\n    worker_thread = threading.Thread(target=run_worker)\n    worker_thread.daemon = True\n    worker_thread.start()\n    app.run(host="0.0.0.0", port=8081)' > health_check.py
-
-# Run worker with health check
-CMD ["python", "health_check.py"]
+# Run with Gunicorn (this is key for Render)
+CMD gunicorn --bind 0.0.0.0:$PORT worker_app:app
