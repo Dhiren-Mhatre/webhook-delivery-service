@@ -7,6 +7,7 @@ celery_app = Celery('webhook_delivery_service',
                     backend=CELERY_RESULT_BACKEND,
                     include=['tasks'])
 
+# Configure Celery
 celery_app.conf.update(
     result_expires=3600,  # Results expire after 1 hour
     task_serializer='json',
