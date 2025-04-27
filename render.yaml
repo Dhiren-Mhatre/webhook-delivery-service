@@ -31,7 +31,7 @@ services:
     env: docker
     dockerfilePath: ./Dockerfile-worker
     dockerContext: .
-    plan: starter
+    plan: free
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -54,7 +54,7 @@ services:
     env: docker
     dockerfilePath: ./Dockerfile-scheduler
     dockerContext: .
-    plan: starter
+    plan: free
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -74,10 +74,10 @@ services:
   # Redis Service
   - type: redis
     name: webhook-redis
-    plan: starter
+    plan: free
     ipAllowList: []
 
 databases:
   - name: webhook-db
-    plan: starter
+    plan: free
     postgresMajorVersion: 13
