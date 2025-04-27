@@ -165,7 +165,7 @@
                     <tbody>
                         {% for delivery in recent_deliveries %}
                             <tr>
-                                <td><code class="small">{{ delivery.id|truncate(10, true, '') }}</code></td>
+                                <td><code class="small">{{ delivery.id|string|truncate(10, true, '') }}</code></td>
                                 <td>
                                     {% if delivery.event_type %}
                                         <span class="badge event-type">{{ delivery.event_type }}</span>
