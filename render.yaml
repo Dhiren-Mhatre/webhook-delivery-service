@@ -28,6 +28,10 @@ services:
         generateValue: true
       - key: PORT
         value: 8080
+      - key: RENDER
+        value: "true"
+      - key: PYTHONUNBUFFERED
+        value: "1"
 
   # Worker Service (as web service with health check endpoint)
   - type: web
@@ -56,6 +60,10 @@ services:
           property: port
       - key: PORT
         value: 8081
+      - key: RENDER
+        value: "true"
+      - key: PYTHONUNBUFFERED
+        value: "1"
 
   # Scheduler Service (as web service with health check endpoint)
   - type: web
@@ -83,6 +91,10 @@ services:
           property: port
       - key: PORT
         value: 8082
+      - key: RENDER
+        value: "true"
+      - key: PYTHONUNBUFFERED
+        value: "1"
 
   # Redis Service
   - type: redis

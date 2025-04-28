@@ -4,6 +4,8 @@ import requests
 import time
 import os
 import sys
+import hmac
+import hashlib
 from datetime import datetime, timedelta
 from flask import current_app
 from contextlib import contextmanager
@@ -19,18 +21,17 @@ def app_context():
     # Add current directory to Python path to help with imports
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     # Now import the app
-    from app import app
+    from app import app, db
     with app.app_context():
-        yield
+        yield db
 
 @celery_app.task(bind=True, max_retries=None)
 def process_webhook(self, delivery_id):
     """Process a webhook delivery with retries"""
-    with app_context():
+    with app_context() as db:
         logger.info(f"Processing webhook delivery: {delivery_id}")
         
         # Import models here to avoid circular imports
-        from app import app, db, cache
         from models import Subscription, WebhookDelivery, DeliveryAttempt
         
         delivery = WebhookDelivery.query.get(delivery_id)
@@ -42,22 +43,23 @@ def process_webhook(self, delivery_id):
         delivery.status = 'processing'
         db.session.commit()
         
-        # Get subscription from cache or database
-        subscription = cache.get(f'subscription_{delivery.subscription_id}')
-        if subscription is None:
-            subscription = Subscription.query.get(delivery.subscription_id)
-            if not subscription:
-                logger.error(f"Subscription not found: {delivery.subscription_id}")
-                delivery.status = 'failed'
-                db.session.commit()
-                return {"error": "Subscription not found"}
-            cache.set(f'subscription_{delivery.subscription_id}', subscription)
+        # Get subscription from database
+        subscription = Subscription.query.get(delivery.subscription_id)
+        if not subscription:
+            logger.error(f"Subscription not found: {delivery.subscription_id}")
+            delivery.status = 'failed'
+            db.session.commit()
+            return {"error": "Subscription not found"}
         
         # Get the current attempt number
         current_attempt = DeliveryAttempt.query.filter_by(delivery_id=delivery_id).count() + 1
         
+        # Get config from app
+        from app import app
+        max_retries = app.config.get('MAX_RETRY_ATTEMPTS', 5)
+        retry_delays = app.config.get('RETRY_DELAYS', [10, 30, 60, 300, 900])
+        
         # Check if maximum retries reached
-        max_retries = app.config['MAX_RETRY_ATTEMPTS']
         if current_attempt > max_retries:
             logger.warning(f"Maximum retry attempts reached for delivery: {delivery_id}")
             delivery.status = 'failed'
@@ -66,7 +68,7 @@ def process_webhook(self, delivery_id):
             return {"status": "failed", "reason": "Maximum retry attempts reached"}
         
         # Attempt delivery
-        attempt_result = attempt_delivery(delivery, subscription, current_attempt)
+        attempt_result = attempt_delivery(delivery, subscription, current_attempt, db)
         
         # If success, update delivery status
         if attempt_result['status'] == 'success':
@@ -76,7 +78,6 @@ def process_webhook(self, delivery_id):
             return {"status": "delivered"}
         
         # If failure, schedule retry with exponential backoff
-        retry_delays = app.config['RETRY_DELAYS']
         retry_index = min(current_attempt - 1, len(retry_delays) - 1)
         retry_delay = retry_delays[retry_index]
         
@@ -85,10 +86,10 @@ def process_webhook(self, delivery_id):
         
         return {"status": "retry_scheduled", "attempt": current_attempt, "next_retry_in": retry_delay}
 
-def attempt_delivery(delivery, subscription, attempt_number):
+def attempt_delivery(delivery, subscription, attempt_number, db):
     """Attempt to deliver a webhook to its target URL"""
-    # Import models and app here to avoid circular imports
-    from app import app, db
+    # Import app here to avoid circular imports
+    from app import app
     from models import DeliveryAttempt
     
     logger.info(f"Attempt {attempt_number} for delivery: {str(delivery.id)}")
@@ -114,8 +115,18 @@ def attempt_delivery(delivery, subscription, attempt_number):
         if delivery.event_type:
             headers['X-Event-Type'] = delivery.event_type
         
+        # Add signature if secret is configured
+        if subscription.secret:
+            payload_bytes = json.dumps(payload).encode('utf-8')
+            signature = hmac.new(
+                subscription.secret.encode('utf-8'),
+                payload_bytes,
+                hashlib.sha256
+            ).hexdigest()
+            headers['X-Hub-Signature-256'] = f"sha256={signature}"
+        
         # Make the POST request with timeout
-        timeout = app.config['DELIVERY_TIMEOUT']
+        timeout = app.config.get('DELIVERY_TIMEOUT', 10)
         response = requests.post(
             subscription.target_url,
             json=payload,
@@ -177,12 +188,12 @@ def attempt_delivery(delivery, subscription, attempt_number):
 @celery_app.task
 def cleanup_old_delivery_logs():
     """Clean up delivery logs older than the retention period"""
-    with app_context():
-        # Import app and models here to avoid circular imports
-        from app import app, db
-        from models import WebhookDelivery
+    with app_context() as db:
+        # Import models here to avoid circular imports
+        from app import app
+        from models import WebhookDelivery, DeliveryAttempt
         
-        retention_hours = app.config['LOG_RETENTION_PERIOD']
+        retention_hours = app.config.get('LOG_RETENTION_PERIOD', 72)
         cutoff_date = datetime.utcnow() - timedelta(hours=retention_hours)
         
         logger.info(f"Cleaning up delivery logs older than {cutoff_date}")
@@ -192,13 +203,22 @@ def cleanup_old_delivery_logs():
             WebhookDelivery.created_at < cutoff_date
         ).all()
         
-        # Delete them and their attempts
+        count = 0
         for delivery in old_deliveries:
-            # No need to manually delete attempts due to cascade delete
+            # Delete related attempts first (foreign key constraint)
+            DeliveryAttempt.query.filter_by(delivery_id=delivery.id).delete()
+            
+            # Delete the delivery
             db.session.delete(delivery)
+            count += 1
+            
+            # Commit in batches to avoid long transactions
+            if count % 100 == 0:
+                db.session.commit()
         
+        # Final commit
         db.session.commit()
         
-        logger.info(f"Cleaned up {len(old_deliveries)} old delivery logs")
+        logger.info(f"Cleaned up {count} old delivery logs")
         
-        return {"status": "success", "deleted_count": len(old_deliveries)}
+        return {"status": "success", "deleted_count": count}

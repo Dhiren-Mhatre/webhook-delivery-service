@@ -8,6 +8,7 @@ from flask_caching import Cache
 import json
 import hmac
 import hashlib
+import requests
 from datetime import datetime, timedelta
 
 logging.basicConfig(level=logging.DEBUG)
@@ -355,11 +356,12 @@ def api_delete_subscription(subscription_id):
         'message': 'Subscription deleted successfully'
     })
 
+
 @app.route('/api/ingest/<int:subscription_id>', methods=['POST'])
 def ingest_webhook(subscription_id):
     """Ingest a webhook for a specific subscription"""
     try:
-        # Get subscription directly from the database (avoid cache to prevent Redis errors)
+        # Get subscription directly from the database
         subscription = Subscription.query.get_or_404(subscription_id)
         
         # Get the webhook payload
@@ -405,97 +407,109 @@ def ingest_webhook(subscription_id):
         db.session.add(delivery)
         db.session.commit()
         
-        # Import task function here to avoid circular import
-        from tasks import process_webhook
+        # Check if we're running on Render or if Celery is not available
+        # This prioritizes direct processing on Render to avoid webhooks being stuck in pending
+        process_directly = True
         
-        try:
-            # Try to queue the webhook for processing if Celery is available
-            process_webhook.delay(str(delivery.id))
-        except:
-            # If Celery is not available, process the webhook directly
-            current_app.logger.warning("Celery not available. Processing webhook directly.")
-            
-            # Process webhook directly
+        # If not on Render, try to use Celery
+        if 'RENDER' not in os.environ:
             try:
-                # Update status to processing
-                delivery.status = 'processing'
-                db.session.commit()
+                # Import task function here to avoid circular import
+                from tasks import process_webhook
                 
-                # Attempt delivery directly
-                attempt_number = 1
+                # Try to queue the webhook for processing using Celery
+                process_webhook.delay(str(delivery.id))
+                process_directly = False
+                current_app.logger.info(f"Queued webhook {delivery.id} for processing by Celery")
+            except Exception as e:
+                current_app.logger.warning(f"Failed to queue webhook with Celery: {str(e)}. Processing directly.")
+                process_directly = True
+        else:
+            current_app.logger.info("Running on Render. Processing webhook directly.")
+        
+        # Process webhook directly if needed (on Render or if Celery failed)
+        if process_directly:
+            # Update status to processing
+            delivery.status = 'processing'
+            db.session.commit()
+            
+            # Attempt to deliver the webhook
+            attempt_number = 1
+            
+            # Create a delivery attempt record
+            attempt = DeliveryAttempt(
+                delivery_id=delivery.id,
+                attempt_number=attempt_number,
+                status='failed',  # Default to failed, update on success
+            )
+            
+            try:
+                # Prepare headers
+                headers = {
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'Webhook-Delivery-Service/1.0',
+                    'X-Webhook-ID': str(delivery.id),
+                    'X-Webhook-Attempt': str(attempt_number)
+                }
                 
-                # Create a delivery attempt record
-                attempt = DeliveryAttempt(
-                    delivery_id=delivery.id,
-                    attempt_number=attempt_number,
-                    status='failed',  # Default to failed, update on success
+                # Add event type if available
+                if delivery.event_type:
+                    headers['X-Event-Type'] = delivery.event_type
+                
+                # Add signature if secret is configured
+                if subscription.secret:
+                    payload_bytes = json.dumps(payload).encode('utf-8')
+                    signature = hmac.new(
+                        subscription.secret.encode('utf-8'),
+                        payload_bytes,
+                        hashlib.sha256
+                    ).hexdigest()
+                    headers['X-Hub-Signature-256'] = f"sha256={signature}"
+                
+                # Make the POST request with timeout
+                timeout = app.config.get('DELIVERY_TIMEOUT', 10)
+                response = requests.post(
+                    subscription.target_url,
+                    json=payload,
+                    headers=headers,
+                    timeout=timeout
                 )
                 
-                try:
-                    import requests
-                    
-                    # Get the payload and prepare headers
-                    payload = delivery.payload
-                    headers = {
-                        'Content-Type': 'application/json',
-                        'User-Agent': 'Webhook-Delivery-Service/1.0',
-                        'X-Webhook-ID': str(delivery.id),
-                        'X-Webhook-Attempt': str(attempt_number)
-                    }
-                    
-                    # Add event type if available
-                    if delivery.event_type:
-                        headers['X-Event-Type'] = delivery.event_type
-                    
-                    # Make the POST request with timeout
-                    timeout = 10  # 10 second timeout
-                    response = requests.post(
-                        subscription.target_url,
-                        json=payload,
-                        headers=headers,
-                        timeout=timeout
-                    )
-                    
-                    # Record the response details
-                    attempt.status_code = response.status_code
-                    
-                    # Limit response body size to avoid storing very large responses
-                    response_body = response.text[:1000]
-                    if len(response.text) > 1000:
-                        response_body += '... [truncated]'
-                    attempt.response_body = response_body
-                    
-                    # Check if successful (2xx response)
-                    if 200 <= response.status_code < 300:
-                        attempt.status = 'success'
-                        delivery.status = 'delivered'
-                    else:
-                        attempt.error_details = f"HTTP error: {response.status_code}"
-                        delivery.status = 'failed'
+                # Record the response details
+                attempt.status_code = response.status_code
                 
-                except requests.Timeout:
-                    attempt.error_details = f"Request timed out after {timeout} seconds"
+                # Limit response body size to avoid storing very large responses
+                response_body = response.text[:1000]
+                if len(response.text) > 1000:
+                    response_body += '... [truncated]'
+                attempt.response_body = response_body
+                
+                # Check if successful (2xx response)
+                if 200 <= response.status_code < 300:
+                    attempt.status = 'success'
+                    delivery.status = 'delivered'
+                else:
+                    attempt.error_details = f"HTTP error: {response.status_code}"
                     delivery.status = 'failed'
-                
-                except requests.ConnectionError as e:
-                    attempt.error_details = f"Connection error: {str(e)}"
-                    delivery.status = 'failed'
-                
-                except Exception as e:
-                    attempt.error_details = f"Unexpected error: {str(e)}"
-                    delivery.status = 'failed'
-                
-                # Save the attempt
-                db.session.add(attempt)
-                delivery.completed_at = datetime.now()
-                db.session.commit()
-                
-                current_app.logger.info(f"Direct webhook delivery completed with status: {delivery.status}")
-            except Exception as e:
-                current_app.logger.error(f"Error in direct webhook delivery: {str(e)}")
+            
+            except requests.Timeout:
+                attempt.error_details = f"Request timed out after {timeout} seconds"
                 delivery.status = 'failed'
-                delivery.completed_at = datetime.now()
-                db.session.commit()
+            
+            except requests.ConnectionError as e:
+                attempt.error_details = f"Connection error: {str(e)}"
+                delivery.status = 'failed'
+            
+            except Exception as e:
+                attempt.error_details = f"Unexpected error: {str(e)}"
+                delivery.status = 'failed'
+            
+            # Save the attempt and update delivery
+            db.session.add(attempt)
+            delivery.completed_at = datetime.now()
+            db.session.commit()
+            
+            current_app.logger.info(f"Direct webhook delivery completed with status: {delivery.status}")
         
         return jsonify({
             'message': 'Webhook accepted for delivery',
@@ -504,6 +518,7 @@ def ingest_webhook(subscription_id):
     
     except Exception as e:
         # Catch all exceptions and return as JSON
+        current_app.logger.error(f"Error in webhook ingestion: {str(e)}")
         return jsonify({
             'error': f'Server error: {str(e)}'
         }), 500
