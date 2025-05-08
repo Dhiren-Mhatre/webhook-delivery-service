@@ -23,5 +23,5 @@ RUN echo 'import os\nimport threading\nfrom flask import Flask\n\napp = Flask(__
 # Expose port
 EXPOSE 8081
 
-# Run with Gunicorn and bind to the PORT env var
-CMD gunicorn worker_app:app --bind 0.0.0.0:$PORT --log-level debug
+# Run with Gunicorn and bind to a fixed port or use PORT env var if available
+CMD ["sh", "-c", "gunicorn worker_app:app --bind 0.0.0.0:${PORT:-8081} --log-level debug"]
